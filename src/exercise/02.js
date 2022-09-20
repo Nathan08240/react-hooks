@@ -8,29 +8,46 @@
 // The callback should set the `name` in localStorage.
 // 💰 window.localStorage.setItem('name', name)
 
-import React, {useEffect, useState} from 'react'
+import React, {useEffect, useState, useRef} from 'react'
 
-function useLocalStorageState (key, defaultValue ='') {
-  const [state, setState] = useState(
-      () => window.localStorage.getItem(key) ?? defaultValue,
-  )
+function useLocalStorageState(
+  key,
+  defaultValue = '',
+  {serialize = JSON.stringify, deserialize = JSON.parse} = {},
+) {
+  const [state, setState] = useState(() => {
+    const valueInLocalStorage = window.localStorage.getItem(key)
+    if (valueInLocalStorage) {
+      return deserialize(valueInLocalStorage)
+    }
+    return typeof defaultValue === 'function' ? defaultValue() : defaultValue
+  })
+
+  const prevKeyRef = useRef(key)
 
   useEffect(() => {
-    window.localStorage.setItem('key', state)
-  },[key, state])
+    const prevKey = prevKeyRef.current
+    if (prevKey !== key) {
+      window.localStorage.removeItem(prevKey)
+    }
+    prevKeyRef.current = key
+    window.localStorage.setItem(key, serialize(state))
+  }, [key, serialize, state])
 
   return [state, setState]
 }
 
 function Greeting({initialName = ''}) {
-  const [name, setName] = useState(useLocalStorageState('name', initialName))
+  const [name, setName] = useLocalStorageState('name', initialName)
+
   function handleChange(event) {
     setName(event.target.value)
   }
+
   return (
     <div>
       <form>
-        <label htmlFor="name">Name: </label>
+        <label htmlFor="name"> Name: </label>
         <input value={name} onChange={handleChange} id="name" />
       </form>
       {name ? <strong>Hello {name}</strong> : 'Please type your name'}
@@ -39,7 +56,7 @@ function Greeting({initialName = ''}) {
 }
 
 function App() {
-  return <Greeting initialName="Nathan"/>
+  return <Greeting />
 }
 
 export default App
